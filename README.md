@@ -20,7 +20,6 @@ Os utilizadores podem verificar a memória disponível e o número de tarefas pe
 Suporte para envio de novas tarefas sem a necessidade de esperar pelas respostas de tarefas anteriores.
 
 
-Instruções para configurar o projeto localmente. Por exemplo:
 
 ## Pré-requisitos
 Java JDK 11 ou superior
