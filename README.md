@@ -1,5 +1,6 @@
-## Nome do Projeto
-Descrição curta do projeto: Uma breve descrição do que seu projeto faz e para que serve.
+## Sistemas Distribuídos — Trabalho Prático
+Cloud Computing
+
 
 ##  Introdução
 Este projeto é uma implementação de um serviço de cloud computing com funcionalidades de Function-as-a-Service (FaaS). Ele permite que os usuários se registrem e autentiquem, enviem tarefas de computação para serem executadas no servidor, e consultem o estado atual de ocupação do serviço.
@@ -33,7 +34,7 @@ Clone o repositório:
 
 git clone https://link-para-o-repositorio
 ```
-Navegue até o diretório do projeto:
+Navegue até à pasta do projeto:
 ```bash
 
 cd sistemasdistribuidos
