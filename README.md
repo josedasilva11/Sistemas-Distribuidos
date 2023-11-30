@@ -22,8 +22,7 @@ Suporte para envio de novas tarefas sem a necessidade de esperar pelas respostas
 
 
 ## Pré-requisitos
-Java JDK 11 ou superior
-Git (para clonagem do repositório)
+Java JDK 11 
 
 ## Instalação
 Clone o repositório:
