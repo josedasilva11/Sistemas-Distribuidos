@@ -5,8 +5,7 @@
 Este projeto é uma implementação de um serviço de cloud computing com funcionalidades de Function-as-a-Service (FaaS). Ele permite que os usuários se registrem e autentiquem, enviem tarefas de computação para serem executadas no servidor, e consultem o estado atual de ocupação do serviço.
 
 ## Funcionalidades
-- Autenticação e Registo de utilizadores: 
-Permite que os utilizadores criem uma conta e façam login no sistema.
+- Autenticação e Registo de utilizadores:  Permite que os utilizadores criem uma conta e façam login no sistema.
 
 
 - Execução de Tarefas: 
