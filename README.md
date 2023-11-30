@@ -1,5 +1,4 @@
-## Sistemas Distribuídos — Trabalho Prático
-Cloud Computing
+## Sistemas Distribuídos — Trabalho Prático - Cloud Computing
 
 
 ##  Introdução
