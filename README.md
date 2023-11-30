@@ -5,16 +5,28 @@ Descrição curta do projeto: Uma breve descrição do que seu projeto faz e par
 Este projeto é uma implementação de um serviço de cloud computing com funcionalidades de Function-as-a-Service (FaaS). Ele permite que os usuários se registrem e autentiquem, enviem tarefas de computação para serem executadas no servidor, e consultem o estado atual de ocupação do serviço.
 
 ## Funcionalidades
-Autenticação e Registro de Usuário: Permite que os usuários criem uma conta e façam login no sistema.
-Execução de Tarefas: Os usuários podem enviar tarefas de computação junto com a quantidade de memória necessária. As tarefas são processadas pelo servidor.
-Consulta de Estado: Os usuários podem verificar a memória disponível e o número de tarefas pendentes no servidor.
-Submissão Assíncrona de Tarefas: Suporte para envio de novas tarefas sem a necessidade de esperar pelas respostas de tarefas anteriores.
-Começando
+Autenticação e Registro de Usuário: 
+Permite que os usuários criem uma conta e façam login no sistema.
+
+
+Execução de Tarefas: 
+Os usuários podem enviar tarefas de computação junto com a quantidade de memória necessária. As tarefas são processadas pelo servidor.
+
+
+Consulta de Estado: 
+Os usuários podem verificar a memória disponível e o número de tarefas pendentes no servidor.
+
+
+Submissão Assíncrona de Tarefas: 
+Suporte para envio de novas tarefas sem a necessidade de esperar pelas respostas de tarefas anteriores.
+
+
 Instruções para configurar o projeto localmente. Por exemplo:
 
 ## Pré-requisitos
 Java JDK 11 ou superior
 Git (para clonagem do repositório)
+
 ## Instalação
 Clone o repositório:
 ```bash
