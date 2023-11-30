@@ -5,19 +5,19 @@
 Este projeto é uma implementação de um serviço de cloud computing com funcionalidades de Function-as-a-Service (FaaS). Ele permite que os usuários se registrem e autentiquem, enviem tarefas de computação para serem executadas no servidor, e consultem o estado atual de ocupação do serviço.
 
 ## Funcionalidades
-Autenticação e Registo de utilizadores: 
+- Autenticação e Registo de utilizadores: 
 Permite que os utilizadores criem uma conta e façam login no sistema.
 
 
-Execução de Tarefas: 
+- Execução de Tarefas: 
 Os utilizadores podem enviar tarefas de computação junto com a quantidade de memória necessária. As tarefas são processadas pelo servidor.
 
 
-Consulta de Estado: 
+- Consulta de Estado: 
 Os utilizadores podem verificar a memória disponível e o número de tarefas pendentes no servidor.
 
 
-Submissão Assíncrona de Tarefas: 
+- Submissão Assíncrona de Tarefas: 
 Suporte para envio de novas tarefas sem a necessidade de esperar pelas respostas de tarefas anteriores.
 
 
