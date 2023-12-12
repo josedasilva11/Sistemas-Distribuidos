@@ -28,7 +28,7 @@ Java JDK 11
 Clone o repositório:
 ```bash
 
-git clone https://link-para-o-repositorio
+git clone https://https://github.com/josedasilva11/Sistemas-Distribuidos
 ```
 Navegue até à pasta do projeto:
 ```bash
