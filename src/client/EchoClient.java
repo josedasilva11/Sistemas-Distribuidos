@@ -44,33 +44,33 @@ public class EchoClient {
                 out.writeUTF(password);
             }
 
-            // Recebendo e exibindo a resposta do servidor
+            // Recebe e exibe a resposta do servidor
             String response = in.readUTF();
             System.out.println(response);
 
-            // Lógica após autenticação bem-sucedida
+            // Autenticação bem-sucedida
             if (response.startsWith("Bem-vindo")) {
-                // Oferecendo ao utilizador a escolha de ação
+                // Oferece ao utilizador a escolha da ação
                 System.out.println(
                         "Digite 'enviar' para enviar uma tarefa ou 'status' para consultar o estado do serviço:");
                 String nextAction = scanner.nextLine();
 
                 // Lógica para enviar uma tarefa
                 if ("enviar".equals(nextAction)) {
-                    System.out.println("Digite a quantidade de memória necessária para a tarefa (em MB):");
+                    System.out.println("Escreva a quantidade de memória necessária para a tarefa (em MB):");
                     long memoryRequired = Long.parseLong(scanner.nextLine());
-                    // Enviando dados da tarefa para o servidor
+                    // Envia dados da tarefa para o servidor
                     out.writeLong(memoryRequired);
                     out.writeUTF("dados da tarefa");
-                    // Recebendo e exibindo a resposta do servidor sobre a tarefa
+                    // Recebe e exibe a resposta do servidor sobre a tarefa
                     String taskResponse = in.readUTF();
                     System.out.println("Resposta do servidor: " + taskResponse);
                 }
                 // Lógica para consultar o estado do serviço
                 else if ("status".equals(nextAction)) {
-                    // Enviando comando de consulta para o servidor
+                    // Envia o comando de consulta para o servidor
                     out.writeUTF("status");
-                    // Recebendo e exibindo informações de memória e tarefas pendentes
+                    // Recebe e exibe informações de memória e tarefas pendentes
                     String memoryStatus = in.readUTF();
                     String taskStatus = in.readUTF();
                     System.out.println(memoryStatus);
@@ -83,9 +83,9 @@ public class EchoClient {
         catch (IOException e) {
             System.out.println("Erro ao conectar com o servidor: " + e.getMessage());
         }
-        // Bloco finally para garantir que o scanner seja fechado
+        // Bloco finally para garantir que o scanner é fechado
         finally {
-            // Fechar o scanner para evitar vazamento de recursos
+            // Fechar o scanner para evitar libertação de recursos
             if (scanner != null) {
                 scanner.close();
             }
