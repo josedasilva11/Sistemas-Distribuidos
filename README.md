@@ -9,7 +9,7 @@ Este projeto é uma implementação de um serviço de cloud computing com funcio
 - **Execução de Tarefas**: Os utilizadores podem enviar tarefas de computação junto com a quantidade de memória necessária. As tarefas são processadas pelo servidor.
 - **Consulta de Estado**: Os utilizadores podem verificar a memória disponível e o número de tarefas pendentes no servidor.
 - **Submissão Assíncrona de Tarefas**: Suporte para envio de novas tarefas sem a necessidade de esperar pelas respostas de tarefas anteriores.
-- **Comunicação Assíncrona no Cliente**: Implementada para permitir que o cliente continue interagindo com o sistema enquanto aguarda as respostas do servidor.
+- **Comunicação Assíncrona no Cliente**: Implementada para permitir que o cliente continue a interagir com o sistema enquanto aguarda as respostas do servidor.
 
 
 
