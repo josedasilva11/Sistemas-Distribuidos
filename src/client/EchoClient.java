@@ -1,5 +1,7 @@
 package src.client;
 
+import java.nio.file.Files;
+
 import java.io.*;
 import java.net.*;
 import java.util.Scanner;
@@ -10,81 +12,72 @@ public class EchoClient {
         int port = 1234;
         Scanner scanner = new Scanner(System.in);
 
-        try (Socket socket = new Socket(hostName, port);
-                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                DataInputStream in = new DataInputStream(socket.getInputStream())) {
+        try (Socket socket = new Socket(hostName, port)) {
+            ResponseCallback callback = response -> System.out.println("Resposta do servidor: " + response);
+            CommunicationThread commThread = new CommunicationThread(socket, callback);
+            new Thread(commThread).start();
 
-            System.out.println("Digite 'register' para se registar ou 'login' para entrar:");
-            String action = scanner.nextLine();
-
-            // Lógica para registro
-            if ("register".equals(action)) {
-                System.out.println("Digite o nome de utilizador para registo:");
-                String username = scanner.nextLine();
-                System.out.println("Digite a password:");
-                String password = scanner.nextLine();
-                // Enviando comandos e dados para o servidor
-                out.writeUTF("register");
-                out.writeUTF(username);
-                out.writeUTF(password);
-            }
-            // Lógica para login
-            else {
-                System.out.println("Digite o seu nome de utilizador:");
-                String username = scanner.nextLine();
-                System.out.println("Digite a sua password:");
-                String password = scanner.nextLine();
-                // Envia comandos e dados para o servidor
-                out.writeUTF("login");
-                out.writeUTF(username);
-                out.writeUTF(password);
-            }
-
-            // Recebe e exibe a resposta do servidor
-            String response = in.readUTF();
-            System.out.println(response);
-
-            // Autenticação bem-sucedida
-            if (response.startsWith("Bem-vindo")) {
+            while (true) {
                 System.out.println(
-                        "Digite 'enviar' para enviar uma tarefa ou 'status' para consultar o estado do serviço:");
-                String nextAction = scanner.nextLine();
+                        "Digite 'register', 'login', 'enviar', 'status' ou 'exit' para a ação correspondente:");
+                String action = scanner.nextLine();
 
-                if ("enviar".equals(nextAction)) {
-                    System.out.println("Escreva o caminho do arquivo de tarefa:");
-                    String filePath = scanner.nextLine();
-                    File file = new File(filePath);
-                    byte[] fileContent = new byte[(int) file.length()];
-                    try (FileInputStream fis = new FileInputStream(file)) {
-                        fis.read(fileContent);
-                    } catch (FileNotFoundException e) {
-                        System.out.println("Arquivo não encontrado: " + e.getMessage());
-                        return;
-                    } catch (IOException e) {
-                        System.out.println("Erro ao ler o arquivo: " + e.getMessage());
-                        return;
-                    }
-
-                    System.out.println("Escreva a quantidade de memória necessária para a tarefa (em MB):");
-                    long memoryRequired = Long.parseLong(scanner.nextLine());
-
-                    out.writeLong(memoryRequired);
-                    out.writeInt(fileContent.length); // Envia o tamanho do arquivo
-                    out.write(fileContent); // Envia o conteúdo do arquivo
-
-                    String taskResponse = in.readUTF();
-                    System.out.println("Resposta do servidor: " + taskResponse);
-                } else if ("status".equals(nextAction)) {
-                    // [Código para consulta de status]
+                if ("exit".equals(action)) {
+                    break; // Encerra o loop e fecha o cliente
                 }
-            }
 
+                handleUserInput(action, scanner, commThread);
+            }
         } catch (IOException e) {
             System.out.println("Erro ao conectar com o servidor: " + e.getMessage());
         } finally {
-            if (scanner != null) {
-                scanner.close();
-            }
+            scanner.close();
+        }
+    }
+
+    private static void handleUserInput(String action, Scanner scanner, CommunicationThread commThread) {
+        switch (action) {
+            case "register":
+            case "login":
+                handleAuthentication(scanner, commThread, action);
+                break;
+            case "enviar":
+                handleFileSending(scanner, commThread);
+                break;
+            case "status":
+                Request statusRequest = new Request("status", "");
+                commThread.addRequest(statusRequest);
+                break;
+            default:
+                System.out.println("Ação desconhecida.");
+                break;
+        }
+    }
+
+    private static void handleAuthentication(Scanner scanner, CommunicationThread commThread, String action) {
+        System.out.println("Digite o seu nome de utilizador:");
+        String username = scanner.nextLine();
+        System.out.println("Digite a sua password:");
+        String password = scanner.nextLine();
+
+        Request authRequest = new Request(action, username + ";" + password);
+        commThread.addRequest(authRequest);
+    }
+
+    private static void handleFileSending(Scanner scanner, CommunicationThread commThread) {
+        try {
+            System.out.println("Escreva o caminho do arquivo de tarefa:");
+            String filePath = scanner.nextLine();
+            File file = new File(filePath);
+            byte[] fileContent = Files.readAllBytes(file.toPath());
+
+            System.out.println("Escreva a quantidade de memória necessária para a tarefa (em MB):");
+            String memoryRequired = scanner.nextLine();
+
+            Request fileRequest = new Request("enviar", new String(fileContent) + ";" + memoryRequired);
+            commThread.addRequest(fileRequest);
+        } catch (IOException e) {
+            System.out.println("Erro ao manipular o arquivo: " + e.getMessage());
         }
     }
 }

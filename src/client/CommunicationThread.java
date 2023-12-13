@@ -5,18 +5,16 @@ import java.net.Socket;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class CommunicationThread implements Runnable {
-    private final Socket socket;
     private final DataOutputStream out;
     private final DataInputStream in;
     private final ConcurrentLinkedQueue<Request> requestQueue;
-    private final ResponseCallback responseCallback; // Adicionando o callback
+    private final ResponseCallback responseCallback;
 
     public CommunicationThread(Socket socket, ResponseCallback responseCallback) throws IOException {
-        this.socket = socket;
         this.out = new DataOutputStream(socket.getOutputStream());
         this.in = new DataInputStream(socket.getInputStream());
         this.requestQueue = new ConcurrentLinkedQueue<>();
-        this.responseCallback = responseCallback; // Inicializando o callback
+        this.responseCallback = responseCallback;
     }
 
     @Override
