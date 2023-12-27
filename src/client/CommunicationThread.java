@@ -25,16 +25,16 @@ public class CommunicationThread implements Runnable {
                 listenForResponses();
             }
         } catch (IOException e) {
-            // Handle exceptions
+            System.out.println("Erro de IO no CommunicationThread: " + e.getMessage());
         }
     }
 
     private void sendPendingRequests() throws IOException {
         while (!requestQueue.isEmpty()) {
             Request request = requestQueue.poll();
-            // Send request to server
+            System.out.println("Enviando pedido: " + request.getAction());
             out.writeUTF(request.getAction());
-            // ... Other data as required
+            out.writeUTF(request.getData()); // Adicione esta linha
         }
     }
 
@@ -42,11 +42,20 @@ public class CommunicationThread implements Runnable {
         new Thread(() -> {
             try {
                 while (!Thread.currentThread().isInterrupted()) {
-                    String response = in.readUTF();
-                    responseCallback.onResponseReceived(response);
+                    try {
+                        String response = in.readUTF();
+                        responseCallback.onResponseReceived(response);
+                    } catch (EOFException e) {
+                        System.out.println("Fim do stream alcançado, fechando a thread de escuta.");
+                        break; // Sair do loop quando o fim do stream é alcançado
+                    }
+                    Thread.sleep(100); // Atraso para evitar uso excessivo da CPU
                 }
             } catch (IOException e) {
-                // Logar ou lidar com a exceção
+                System.out.println("Erro ao escutar respostas: " + e.getMessage());
+            } catch (InterruptedException e) {
+                System.out.println("Thread de escuta interrompida.");
+                Thread.currentThread().interrupt(); // Preservar o status de interrupção
             }
         }).start();
     }

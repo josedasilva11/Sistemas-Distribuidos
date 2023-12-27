@@ -1,27 +1,70 @@
 package src.server;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.io.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public class UserManager {
     private Map<String, String> userCredentials = new HashMap<>();
+    private static final String USER_DATA_FILE = "userCredentials.txt";
 
     public UserManager() {
+        loadUserData();
+    }
+
+    private void loadUserData() {
+        File file = new File(USER_DATA_FILE);
+        if (!file.exists()) {
+            try {
+                file.createNewFile(); // Cria um novo arquivo se ele não existir
+            } catch (IOException e) {
+                System.out.println("Não foi possível criar o arquivo de credenciais do usuário: " + e.getMessage());
+                return; // Sair do método se não puder criar o arquivo
+            }
+        }
+
+        // Continuação da leitura do arquivo, agora sabendo que ele existe
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(":");
+                if (parts.length == 2) {
+                    userCredentials.put(parts[0], parts[1]);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Erro ao ler dados dos usuários: " + e.getMessage());
+        }
+    }
+
+    private void saveUserData() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(USER_DATA_FILE))) {
+            for (Map.Entry<String, String> entry : userCredentials.entrySet()) {
+                writer.write(entry.getKey() + ":" + entry.getValue() + "\n");
+            }
+        } catch (IOException e) {
+            System.out.println("Erro ao salvar dados dos usuários: " + e.getMessage());
+        }
     }
 
     public boolean authenticate(String username, String password) {
         String storedPasswordHash = userCredentials.get(username);
         String providedPasswordHash = hashPassword(password);
+
+        System.out.println("Hash armazenado: " + storedPasswordHash);
+        System.out.println("Hash fornecido: " + providedPasswordHash);
+
         return storedPasswordHash != null && storedPasswordHash.equals(providedPasswordHash);
     }
 
     public boolean registerUser(String username, String password) {
         if (userCredentials.containsKey(username)) {
-            return false;
+            return false; // Nome de usuário já existe
         }
-        userCredentials.put(username, hashPassword(password));
+        String passwordHash = hashPassword(password);
+        userCredentials.put(username, passwordHash);
+        saveUserData(); // Salva os dados atualizados no arquivo
         return true;
     }
 

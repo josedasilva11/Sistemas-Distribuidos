@@ -2,29 +2,31 @@ package src.server;
 
 import java.io.*;
 import java.net.*;
-//import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class EchoServer {
-    // private static final long WAIT_TIME_BEFORE_RETRYING = 5000;
     private static final long TOTAL_MEMORY = Runtime.getRuntime().maxMemory();
     private static TaskQueueManager taskQueueManager = new TaskQueueManager(TOTAL_MEMORY);
     private static UserManager userManager = new UserManager();
 
     public static void main(String[] args) {
         int port = 1234;
-
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Servidor iniciado na porta " + port);
 
             while (true) {
-                try (Socket clientSocket = serverSocket.accept();
-                        DataInputStream in = new DataInputStream(clientSocket.getInputStream());
-                        DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("Nova conexão aceita: " + clientSocket.getInetAddress().getHostAddress());
 
+                DataInputStream in = new DataInputStream(clientSocket.getInputStream());
+                DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
+
+                try {
                     String action = in.readUTF();
+                    System.out.println("Ação recebida: " + action);
                     handleAction(action, in, out, clientSocket);
                 } catch (IOException e) {
                     System.out.println("Erro de comunicação: " + e.getMessage());
+                    clientSocket.close(); // Fechar o socket do cliente em caso de erro
                 }
             }
         } catch (IOException e) {
@@ -36,15 +38,25 @@ public class EchoServer {
             throws IOException {
         switch (action) {
             case "register":
+                System.out.println("Registrando usuário...");
                 handleRegister(in, out);
                 break;
             case "login":
-                handleLogin(in, out);
+                // Lê o nome de usuário como antes
+                String username = in.readUTF();
+                // Agora espera a próxima ação para ser "password"
+                String passwordAction = in.readUTF();
+                if ("password".equals(passwordAction)) {
+                    String password = in.readUTF(); // Lê a senha
+                    handleLogin(username, password, out);
+                }
                 break;
             case "status":
+                System.out.println("Enviando status do servidor...");
                 handleStatus(out);
                 break;
             case "enviarTarefa":
+                System.out.println("Processando tarefa...");
                 handleTaskSubmission(in, clientSocket);
                 break;
             default:
@@ -54,17 +66,33 @@ public class EchoServer {
     }
 
     private static void handleRegister(DataInputStream in, DataOutputStream out) throws IOException {
-        String username = in.readUTF();
-        String password = in.readUTF();
-        boolean success = userManager.registerUser(username, password);
-        out.writeUTF(success ? "Registo bem-sucedido." : "Nome de utilizador já existe.");
+        try {
+            String combinedCredentials = in.readUTF();
+            String[] credentials = combinedCredentials.split(";");
+            if (credentials.length != 2) {
+                out.writeUTF("Dados inválidos.");
+                return;
+            }
+            String username = credentials[0].trim();
+            String password = credentials[1].trim();
+
+            boolean success = userManager.registerUser(username, password);
+            String response = success ? "Registo bem-sucedido." : "Nome de utilizador já existe.";
+            out.writeUTF(response);
+        } catch (Exception e) {
+            out.writeUTF("Erro no registro: " + e.getMessage());
+        }
     }
 
-    private static void handleLogin(DataInputStream in, DataOutputStream out) throws IOException {
-        String username = in.readUTF();
-        String password = in.readUTF();
+    private static void handleLogin(String username, String password, DataOutputStream out) throws IOException {
+        System.out.println("Entrando no método handleLogin");
+        System.out.println("Nome de usuário lido: " + username);
+        System.out.println("Senha recebida (antes do hash): '" + password + "'"); // Log para depuração
+
         boolean isAuthenticated = userManager.authenticate(username, password);
-        out.writeUTF(isAuthenticated ? "Bem-vindo " + username : "Falha na autenticação.");
+        String response = isAuthenticated ? "Bem-vindo " + username : "Falha na autenticação.";
+        out.writeUTF(response);
+        System.out.println("Resposta enviada: " + response);
     }
 
     private static void handleStatus(DataOutputStream out) throws IOException {
@@ -123,5 +151,4 @@ public class EchoServer {
         in.readFully(data);
         return data;
     }
-
 }
