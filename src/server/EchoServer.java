@@ -6,34 +6,35 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 public class EchoServer {
-    private static final long TOTAL_MEMORY = Runtime.getRuntime().maxMemory();
-    private static TaskQueueManager taskQueueManager = new TaskQueueManager(TOTAL_MEMORY);
-    private static UserManager userManager = new UserManager();
+    private static final long TOTAL_MEMORY = Runtime.getRuntime().maxMemory(); // memória total
+    private static TaskQueueManager taskQueueManager = new TaskQueueManager(TOTAL_MEMORY); // queue de tarefas
+    private static UserManager userManager = new UserManager(); // gere os utilizadores
 
     public static void main(String[] args) {
         int port = 1234;
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Servidor iniciado na porta " + port);
 
+            // loop infinito para aceitar conexões
             while (true) {
                 try (Socket clientSocket = serverSocket.accept()) {
-                    System.out.println("Nova conexão aceita: " + clientSocket.getInetAddress().getHostAddress());
+                    System.out.println("Nova conexão aceite: " + clientSocket.getInetAddress().getHostAddress());
 
                     DataInputStream in = new DataInputStream(clientSocket.getInputStream());
                     DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
 
+                    // Loop para lidar com as ações do cliente
                     while (!clientSocket.isClosed()) {
                         try {
                             String action = in.readUTF();
                             System.out.println("Ação recebida: " + action);
                             handleAction(action, in, out, clientSocket);
                         } catch (EOFException e) {
-                            System.out
-                                    .println("Cliente desconectado: " + clientSocket.getInetAddress().getHostAddress());
-                            break; // Encerrar o loop se o cliente desconectar
+                            System.out.println("Cliente desconectado: " + clientSocket.getInetAddress().getHostAddress());
+                            break; // Fechar o loop se o cliente se desconectar
                         } catch (IOException e) {
                             System.out.println("Erro de comunicação: " + e.getMessage());
-                            break; // Encerrar o loop em caso de outro erro de comunicação
+                            break; // Fechar o loop em caso de outro erro de comunicação
                         }
                     }
                 } catch (IOException e) {
@@ -45,6 +46,7 @@ public class EchoServer {
         }
     }
 
+    // Lida com a ação escolhida pelo cliente
     private static void handleAction(String action, DataInputStream in, DataOutputStream out, Socket clientSocket)
             throws IOException {
         switch (action) {
@@ -69,24 +71,27 @@ public class EchoServer {
         }
     }
 
+    // Lida com o registo do cliente
     private static void handleRegister(DataInputStream in, DataOutputStream out) throws IOException {
-        String username = in.readUTF(); // Lê o nome de usuário
-        String password = in.readUTF(); // Lê a senha
+        String username = in.readUTF(); 
+        String password = in.readUTF(); 
 
         boolean success = userManager.registerUser(username, password);
         String response = success ? "Registo bem-sucedido." : "Nome de utilizador já existe.";
         out.writeUTF(response);
     }
 
+    // Lida com a autenticação do cliente
     private static void handleLogin(DataInputStream in, DataOutputStream out) throws IOException {
-        String username = in.readUTF(); // Lê o nome de usuário
-        String password = in.readUTF(); // Lê a senha
+        String username = in.readUTF(); 
+        String password = in.readUTF(); 
 
         boolean isAuthenticated = userManager.authenticate(username, password);
         String response = isAuthenticated ? "Bem-vindo " + username : "Falha na autenticação.";
         out.writeUTF(response);
     }
 
+    // Lida com um pedido do estado
     private static void handleStatus(DataOutputStream out) throws IOException {
         long availableMemory = getAvailableMemory();
         int pendingTasks = taskQueueManager.getTaskCount();
@@ -94,10 +99,11 @@ public class EchoServer {
         System.out.println("Enviando status: Memória disponível - " + availableMemory +
                 " bytes, Tarefas pendentes - " + pendingTasks);
 
-        out.writeUTF("Memória disponível: " + availableMemory + " bytes");
-        out.writeUTF("Tarefas pendentes: " + pendingTasks);
+        String response = "Memória disponível: " + availableMemory + " bytes" + "Tarefas pendentes: " + pendingTasks;
+        out.writeUTF(response);
     }
 
+    // Lida com o envio de uma tarefa
     private static void handleTaskSubmission(DataInputStream in, Socket clientSocket, DataOutputStream out)
             throws IOException {
         try {
@@ -114,7 +120,7 @@ public class EchoServer {
             in.readFully(taskData);
             System.out.println("Dados da tarefa recebidos com sucesso. Tamanho: " + dataSize + " bytes");
 
-            // Lê a memória requerida para a tarefa
+            // Lê a memória necessária para a tarefa
             System.out.println("Lendo memória requerida para a tarefa...");
             long memoryRequired = in.readLong();
             System.out.println("Memória requerida para a tarefa: " + memoryRequired + " bytes");
@@ -127,6 +133,7 @@ public class EchoServer {
         }
     }
 
+    // Processa os dados da tarefa
     private static void processReceivedTaskData(Socket clientSocket, byte[] taskData, long memoryRequired,
             DataOutputStream out) throws IOException {
         System.out.println("Processando dados da tarefa recebidos...");
@@ -143,10 +150,12 @@ public class EchoServer {
         }
     }
 
+    // Devolve a memória disponível
     private static long getAvailableMemory() {
         return taskQueueManager.getAvailableMemory();
     }
 
+    // Processa a tarefa em si
     private static void processTask(Task task) {
         try {
             System.out.println("Processando tarefa...");
@@ -162,6 +171,7 @@ public class EchoServer {
         }
     }
 
+    // Envia o resultado da tarefa
     private static void sendTaskResult(Socket clientSocket, String message, byte[] result) {
         try (DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream())) {
             out.writeUTF(message);
@@ -173,6 +183,7 @@ public class EchoServer {
         }
     }
 
+    // Fecha a conexão com o cliente quando este o deseja
     private static void handleClientExit(Socket clientSocket) {
         try {
             System.out.println("Fechando conexão com o cliente: " + clientSocket.getInetAddress().getHostAddress());
@@ -182,6 +193,7 @@ public class EchoServer {
         }
     }
 
+    // Fecha o socket
     private static void closeClientSocket(Socket clientSocket) {
         try {
             if (clientSocket != null && !clientSocket.isClosed()) {
@@ -192,6 +204,7 @@ public class EchoServer {
         }
     }
 
+    // Recebe os dados da tarefa
     private static byte[] receiveTaskData(DataInputStream in) throws IOException {
         try {
             int dataSize = in.readInt();
