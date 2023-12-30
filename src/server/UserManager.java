@@ -14,7 +14,7 @@ public class UserManager {
         loadUserData();
     }
 
-    private String hashPassword(String password) {
+    public String hashPassword(String password) {
         return Base64.getEncoder().encodeToString(password.getBytes());
     }
 
@@ -57,6 +57,8 @@ public class UserManager {
         String storedPasswordHash = userCredentials.get(username);
         String providedPasswordHash = hashPassword(password);
 
+        System.out.println("Nome de utilizador recebido: " + username);
+        System.out.println("Password recebida: " + password);
         System.out.println("Hash armazenado: " + storedPasswordHash);
         System.out.println("Hash fornecido: " + providedPasswordHash);
 
@@ -65,12 +67,13 @@ public class UserManager {
 
     public boolean registerUser(String username, String password) {
         if (userCredentials.containsKey(username)) {
-            return false; // Nome de usuário já existe
+            System.out.println("Registration failed: Nome de utilizador já existe.");
+            return false; // Nome de utilizador já existe
         }
         String passwordHash = hashPassword(password);
         userCredentials.put(username, passwordHash);
         saveUserData(); // Salva os dados atualizados no arquivo
+        System.out.println("Registration successful: Nome de utilizador - " + username);
         return true;
     }
-
 }

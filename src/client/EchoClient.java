@@ -11,33 +11,57 @@ public class EchoClient {
     private static volatile boolean isLoggedIn = false;
     private static CompletableFuture<Void> loginFuture = new CompletableFuture<>();
     private static CompletableFuture<Void> responseFuture = new CompletableFuture<>();
+    private static final String AUTH_SERVER_HOST = "localhost";
+    private static final int AUTH_SERVER_PORT = 1234;
+    private static final int QUEUE_MANAGER_PORT = 12345;
+    private static CompletableFuture<Void> actionFuture = CompletableFuture.completedFuture(null);
+    private static CommunicationThread commThread;
+    private static Thread commThreadRunner;
 
     public static void main(String[] args) {
-        String hostName = "localhost";
-        int port = 1234;
-
-        try {
-            Socket socket = new Socket(hostName, port);
-            System.out.println("Conectado ao servidor em " + hostName + ":" + port);
+        Scanner scanner = new Scanner(System.in);
+        try (Socket authSocket = new Socket(AUTH_SERVER_HOST, AUTH_SERVER_PORT)) {
+            System.out.println("Conectado ao servidor de autenticação em " + AUTH_SERVER_HOST + ":" + AUTH_SERVER_PORT);
 
             ResponseCallback callback = response -> {
                 System.out.println("Resposta do servidor: " + response);
-                responseFuture.complete(null); // Sinaliza que a resposta foi recebida
                 if (response.startsWith("Bem-vindo")) {
                     isLoggedIn = true;
-                    loginFuture.complete(null); // Completa o futuro quando o login é bem-sucedido
+                    loginFuture.complete(null);
+                    // Imprime a mensagem de boas-vindas e continua com o menu de usuário logado
+                    System.out.println(response);
+                    while (isLoggedIn) {
+                        System.out.println(
+                                "Digite 'enviar', 'status', 'statusQueue' ou 'exit' para a ação correspondente:");
+                        String action = scanner.nextLine();
+                        handleUserInput(action, scanner);
+                        if ("exit".equals(action)) {
+                            commThreadRunner.interrupt();
+                            break;
+                        }
+                        responseFuture = new CompletableFuture<>();
+                        if (!"login".equals(action)) {
+                            actionFuture.join();
+                        }
+                        responseFuture.join();
+                        if ("login".equals(action)) {
+                            loginFuture.join();
+                            loginFuture = new CompletableFuture<>();
+                        }
+                    }
                 }
             };
-            CommunicationThread commThread = new CommunicationThread(socket, callback);
-            Thread commThreadRunner = new Thread(commThread);
+
+            commThread = new CommunicationThread(authSocket, callback);
+            commThreadRunner = new Thread(commThread);
             commThreadRunner.start();
 
-            Scanner scanner = new Scanner(System.in);
             while (true) {
                 if (!isLoggedIn) {
                     System.out.println("Digite 'register', 'login' ou 'exit' para a ação correspondente:");
                 } else {
-                    System.out.println("Digite 'enviar', 'status' ou 'exit' para a ação correspondente:");
+                    System.out
+                            .println("Digite 'enviar', 'status', 'statusQueue' ou 'exit' para a ação correspondente:");
                 }
 
                 String action = scanner.nextLine();
@@ -45,9 +69,16 @@ public class EchoClient {
                     commThreadRunner.interrupt(); // Interrompe a thread de comunicação
                     break;
                 }
-                handleUserInput(action, scanner, commThread, socket); // Passa socket como argumento
+                handleUserInput(action, scanner);
+                if ("login".equals(action)) {
+                    actionFuture = loginFuture; // Use a CompletableFuture correta
+                }
 
                 responseFuture = new CompletableFuture<>();
+
+                if (!"login".equals(action)) {
+                    actionFuture.join(); // Aguarde a ação ser concluída
+                }
                 responseFuture.join(); // Aguarda a resposta do servidor
 
                 if ("login".equals(action)) {
@@ -57,43 +88,40 @@ public class EchoClient {
             }
 
             scanner.close();
-            if (!socket.isClosed()) {
-                socket.close(); // Fecha o socket
-            }
         } catch (IOException e) {
             System.out.println("Erro ao conectar com o servidor: " + e.getMessage());
         }
     }
 
-    private static void handleUserInput(String action, Scanner scanner, CommunicationThread commThread, Socket socket) {
-
+    private static void handleUserInput(String action, Scanner scanner) {
         switch (action) {
             case "register":
-                System.out.println("Registrando usuário...");
-                sendCredentials(scanner, commThread, "register");
-                break;
             case "login":
-                System.out.println("Autenticando usuário...");
-                sendCredentials(scanner, commThread, "login");
-                break;
-            case "status":
-                System.out.println("Solicitando status do servidor...");
-                commThread.addRequest(new Request("status", ""));
+                sendCredentials(scanner, action);
                 break;
             case "enviar":
-                System.out.println("Enviando arquivo de tarefa...");
-                handleFileSending(scanner, commThread);
+                if (isLoggedIn) {
+                    handleFileSending(scanner);
+                } else {
+                    System.out.println("Você precisa estar logado para enviar tarefas.");
+                }
+                break;
+            case "status":
+                if (isLoggedIn) {
+                    requestStatusFromAuthServer();
+                } else {
+                    System.out.println("Você precisa estar logado para verificar o status.");
+                }
+                break;
+            case "statusQueue":
+                if (isLoggedIn) {
+                    requestStatusFromQueueManager();
+                } else {
+                    System.out.println("Você precisa estar logado para verificar o status da fila.");
+                }
                 break;
             case "exit":
-                try {
-                    if (socket != null && !socket.isClosed()) {
-                        socket.close(); // Fechar o socket
-                    }
-                    System.out.println("Conexão encerrada. Saindo do programa.");
-                    System.exit(0); // Encerrar o programa
-                } catch (IOException e) {
-                    System.out.println("Erro ao fechar o socket: " + e.getMessage());
-                }
+                System.out.println("Encerrando o programa.");
                 break;
             default:
                 System.out.println("Ação desconhecida.");
@@ -101,21 +129,43 @@ public class EchoClient {
         }
     }
 
-    private static void sendCredentials(Scanner scanner, CommunicationThread commThread, String actionType) {
+    private static void sendCredentials(Scanner scanner, String actionType) {
         System.out.println("Digite o seu nome de utilizador:");
         String username = scanner.nextLine();
         System.out.println("Digite a sua password:");
         String password = scanner.nextLine();
 
-        // Codificação Base64 da senha
         String encodedPassword = Base64.getEncoder().encodeToString(password.getBytes());
+        System.out.println("Enviando ação: " + actionType);
+        System.out.println("Enviando nome de utilizador: " + username);
+        System.out.println("Enviando password: " + encodedPassword);
 
         commThread.addRequest(new Request(actionType, username));
         commThread.addRequest(new Request("password", encodedPassword));
     }
 
+    private static void requestStatusFromAuthServer() {
+        System.out.println("Solicitando status do servidor de autenticação...");
+        commThread.addRequest(new Request("status", "auth"));
+    }
+
+    private static void requestStatusFromQueueManager() {
+        System.out.println("Solicitando status do QueueManager...");
+        try (Socket socket = new Socket(AUTH_SERVER_HOST, QUEUE_MANAGER_PORT)) {
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+
+            out.writeUTF("statusQueue");
+
+            String response = in.readUTF();
+            System.out.println("Status do QueueManager: " + response);
+        } catch (IOException e) {
+            System.out.println("Erro ao solicitar status do QueueManager: " + e.getMessage());
+        }
+    }
+
     // Método para lidar com o envio do arquivo
-    private static void handleFileSending(Scanner scanner, CommunicationThread commThread) {
+    private static void handleFileSending(Scanner scanner) {
         try {
             System.out.println("Escreva o caminho do arquivo de tarefa:");
             String filePath = scanner.nextLine();

@@ -12,7 +12,7 @@ public class CommunicationThread implements Runnable {
     private final ResponseCallback responseCallback;
 
     public CommunicationThread(Socket socket, ResponseCallback responseCallback) throws IOException {
-        this.socket = socket; // Adicionar esta linha
+        this.socket = socket;
         this.out = new DataOutputStream(socket.getOutputStream());
         this.in = new DataInputStream(socket.getInputStream());
         this.requestQueue = new ConcurrentLinkedQueue<>();
@@ -40,7 +40,7 @@ public class CommunicationThread implements Runnable {
             Request request = requestQueue.poll();
             System.out.println("Enviando pedido: " + request.getAction());
             out.writeUTF(request.getAction());
-            out.writeUTF(request.getData()); // Adicione esta linha
+            out.writeUTF(request.getData());
         }
     }
 
@@ -52,8 +52,7 @@ public class CommunicationThread implements Runnable {
                         String response = in.readUTF();
                         responseCallback.onResponseReceived(response);
                     } catch (EOFException e) {
-                        System.out.println("Fim do stream alcançado, fechando a thread de escuta.");
-                        break;
+                        // Ignora a exceção EOFException
                     }
                     Thread.sleep(100);
                 }
