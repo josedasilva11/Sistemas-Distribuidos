@@ -5,10 +5,12 @@ import java.net.*;
 import java.nio.file.Files;
 import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
+import java.util.Base64;
 
 public class EchoClient {
     private static volatile boolean isLoggedIn = false;
     private static CompletableFuture<Void> loginFuture = new CompletableFuture<>();
+    private static CompletableFuture<Void> responseFuture = new CompletableFuture<>();
 
     public static void main(String[] args) {
         String hostName = "localhost";
@@ -20,6 +22,7 @@ public class EchoClient {
 
             ResponseCallback callback = response -> {
                 System.out.println("Resposta do servidor: " + response);
+                responseFuture.complete(null); // Sinaliza que a resposta foi recebida
                 if (response.startsWith("Bem-vindo")) {
                     isLoggedIn = true;
                     loginFuture.complete(null); // Completa o futuro quando o login é bem-sucedido
@@ -33,45 +36,45 @@ public class EchoClient {
             while (true) {
                 if (!isLoggedIn) {
                     System.out.println("Digite 'register', 'login' ou 'exit' para a ação correspondente:");
-                    String action = scanner.nextLine();
-                    if ("exit".equals(action)) {
-                        break;
-                    }
-                    handleUserInput(action, scanner, commThread);
-
-                    if ("login".equals(action)) {
-                        loginFuture.join(); // Aguarda a conclusão do futuro
-                        loginFuture = new CompletableFuture<>(); // Reset para próximos logins
-                    }
                 } else {
                     System.out.println("Digite 'enviar', 'status' ou 'exit' para a ação correspondente:");
-                    String action = scanner.nextLine();
-                    if ("exit".equals(action)) {
-                        break;
-                    }
-                    handleUserInput(action, scanner, commThread);
+                }
+
+                String action = scanner.nextLine();
+                if ("exit".equals(action)) {
+                    commThreadRunner.interrupt(); // Interrompe a thread de comunicação
+                    break;
+                }
+                handleUserInput(action, scanner, commThread, socket); // Passa socket como argumento
+
+                responseFuture = new CompletableFuture<>();
+                responseFuture.join(); // Aguarda a resposta do servidor
+
+                if ("login".equals(action)) {
+                    loginFuture.join(); // Aguarda a conclusão do futuro
+                    loginFuture = new CompletableFuture<>(); // Reset para próximos logins
                 }
             }
 
             scanner.close();
-            socket.close();
+            if (!socket.isClosed()) {
+                socket.close(); // Fecha o socket
+            }
         } catch (IOException e) {
             System.out.println("Erro ao conectar com o servidor: " + e.getMessage());
         }
     }
 
-    private static void handleUserInput(String action, Scanner scanner, CommunicationThread commThread) {
+    private static void handleUserInput(String action, Scanner scanner, CommunicationThread commThread, Socket socket) {
+
         switch (action) {
             case "register":
+                System.out.println("Registrando usuário...");
+                sendCredentials(scanner, commThread, "register");
+                break;
             case "login":
-                System.out.println(action.equals("register") ? "Registrando usuário..." : "Autenticando usuário...");
-                System.out.println("Digite o seu nome de utilizador:");
-                String username = scanner.nextLine();
-                System.out.println("Digite a sua password:");
-                String password = scanner.nextLine();
-
-                commThread.addRequest(new Request(action, username)); // Envia o nome de usuário
-                commThread.addRequest(new Request("password", password)); // Envia a senha
+                System.out.println("Autenticando usuário...");
+                sendCredentials(scanner, commThread, "login");
                 break;
             case "status":
                 System.out.println("Solicitando status do servidor...");
@@ -81,22 +84,37 @@ public class EchoClient {
                 System.out.println("Enviando arquivo de tarefa...");
                 handleFileSending(scanner, commThread);
                 break;
+            case "exit":
+                try {
+                    if (socket != null && !socket.isClosed()) {
+                        socket.close(); // Fechar o socket
+                    }
+                    System.out.println("Conexão encerrada. Saindo do programa.");
+                    System.exit(0); // Encerrar o programa
+                } catch (IOException e) {
+                    System.out.println("Erro ao fechar o socket: " + e.getMessage());
+                }
+                break;
             default:
                 System.out.println("Ação desconhecida.");
                 break;
         }
     }
 
-    private static void handleAuthentication(Scanner scanner, CommunicationThread commThread, String action) {
+    private static void sendCredentials(Scanner scanner, CommunicationThread commThread, String actionType) {
         System.out.println("Digite o seu nome de utilizador:");
         String username = scanner.nextLine();
         System.out.println("Digite a sua password:");
         String password = scanner.nextLine();
 
-        String combinedCredentials = username + ";" + password; // Combina o nome de usuário e senha
-        commThread.addRequest(new Request(action, combinedCredentials));
+        // Codificação Base64 da senha
+        String encodedPassword = Base64.getEncoder().encodeToString(password.getBytes());
+
+        commThread.addRequest(new Request(actionType, username));
+        commThread.addRequest(new Request("password", encodedPassword));
     }
 
+    // Método para lidar com o envio do arquivo
     private static void handleFileSending(Scanner scanner, CommunicationThread commThread) {
         try {
             System.out.println("Escreva o caminho do arquivo de tarefa:");
@@ -105,12 +123,25 @@ public class EchoClient {
             byte[] fileContent = Files.readAllBytes(file.toPath());
 
             System.out.println("Escreva a quantidade de memória necessária para a tarefa (em MB):");
-            String memoryRequired = scanner.nextLine();
+            long memoryRequired = Long.parseLong(scanner.nextLine()) * 1024 * 1024; // Convertendo de MB para bytes
 
-            Request fileRequest = new Request("enviar", new String(fileContent) + ";" + memoryRequired);
-            commThread.addRequest(fileRequest);
+            DataOutputStream out = commThread.getDataOutputStream();
+
+            // Primeiro, envia o tamanho do conteúdo do arquivo
+            System.out.println("Enviando tamanho do arquivo: " + fileContent.length + " bytes");
+            out.writeInt(fileContent.length);
+
+            // Em seguida, envia o conteúdo do arquivo
+            System.out.println("Enviando conteúdo do arquivo...");
+            out.write(fileContent);
+
+            // Por último, envia a quantidade de memória requerida
+            System.out.println("Enviando memória requerida para a tarefa: " + memoryRequired + " bytes");
+            out.writeLong(memoryRequired);
+
+            System.out.println("Arquivo de tarefa e memória requerida enviados para o servidor...");
         } catch (IOException e) {
-            System.out.println("Erro ao manipular o arquivo: " + e.getMessage());
+            System.out.println("Erro ao enviar arquivo: " + e.getMessage());
         }
     }
 }

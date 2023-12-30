@@ -38,4 +38,8 @@ public class TaskQueueManager {
         return taskQueue.size();
 
     }
+
+    public boolean canAddTask(Task task) {
+        return availableMemory.get() >= task.getMemoryRequired();
+    }
 }

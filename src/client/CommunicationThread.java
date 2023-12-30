@@ -7,10 +7,12 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class CommunicationThread implements Runnable {
     private final DataOutputStream out;
     private final DataInputStream in;
+    private final Socket socket;
     private final ConcurrentLinkedQueue<Request> requestQueue;
     private final ResponseCallback responseCallback;
 
     public CommunicationThread(Socket socket, ResponseCallback responseCallback) throws IOException {
+        this.socket = socket; // Adicionar esta linha
         this.out = new DataOutputStream(socket.getOutputStream());
         this.in = new DataInputStream(socket.getInputStream());
         this.requestQueue = new ConcurrentLinkedQueue<>();
@@ -29,6 +31,10 @@ public class CommunicationThread implements Runnable {
         }
     }
 
+    public DataOutputStream getDataOutputStream() {
+        return out;
+    }
+
     private void sendPendingRequests() throws IOException {
         while (!requestQueue.isEmpty()) {
             Request request = requestQueue.poll();
@@ -41,21 +47,23 @@ public class CommunicationThread implements Runnable {
     private void listenForResponses() {
         new Thread(() -> {
             try {
-                while (!Thread.currentThread().isInterrupted()) {
+                while (!Thread.currentThread().isInterrupted() && !this.socket.isClosed()) {
                     try {
                         String response = in.readUTF();
                         responseCallback.onResponseReceived(response);
                     } catch (EOFException e) {
                         System.out.println("Fim do stream alcançado, fechando a thread de escuta.");
-                        break; // Sair do loop quando o fim do stream é alcançado
+                        break;
                     }
-                    Thread.sleep(100); // Atraso para evitar uso excessivo da CPU
+                    Thread.sleep(100);
                 }
             } catch (IOException e) {
-                System.out.println("Erro ao escutar respostas: " + e.getMessage());
+                if (!this.socket.isClosed()) {
+                    System.out.println("Erro ao escutar respostas: " + e.getMessage());
+                }
             } catch (InterruptedException e) {
                 System.out.println("Thread de escuta interrompida.");
-                Thread.currentThread().interrupt(); // Preservar o status de interrupção
+                Thread.currentThread().interrupt();
             }
         }).start();
     }
@@ -64,5 +72,4 @@ public class CommunicationThread implements Runnable {
         requestQueue.add(request);
     }
 
-    // Define a Request class or use a suitable data structure for your requests
 }

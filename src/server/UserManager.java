@@ -2,6 +2,7 @@ package src.server;
 
 import java.util.*;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -11,6 +12,10 @@ public class UserManager {
 
     public UserManager() {
         loadUserData();
+    }
+
+    private String hashPassword(String password) {
+        return Base64.getEncoder().encodeToString(password.getBytes());
     }
 
     private void loadUserData() {
@@ -68,22 +73,4 @@ public class UserManager {
         return true;
     }
 
-    private String hashPassword(String password) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(password.getBytes());
-            StringBuilder hexString = new StringBuilder();
-
-            for (int i = 0; i < hash.length; i++) {
-                String hex = Integer.toHexString(0xff & hash[i]);
-                if (hex.length() == 1)
-                    hexString.append('0');
-                hexString.append(hex);
-            }
-
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Erro ao hash a password", e);
-        }
-    }
 }

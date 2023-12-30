@@ -2,6 +2,8 @@ package src.server;
 
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 public class EchoServer {
     private static final long TOTAL_MEMORY = Runtime.getRuntime().maxMemory();
@@ -14,19 +16,28 @@ public class EchoServer {
             System.out.println("Servidor iniciado na porta " + port);
 
             while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("Nova conexão aceita: " + clientSocket.getInetAddress().getHostAddress());
+                try (Socket clientSocket = serverSocket.accept()) {
+                    System.out.println("Nova conexão aceita: " + clientSocket.getInetAddress().getHostAddress());
 
-                DataInputStream in = new DataInputStream(clientSocket.getInputStream());
-                DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
+                    DataInputStream in = new DataInputStream(clientSocket.getInputStream());
+                    DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
 
-                try {
-                    String action = in.readUTF();
-                    System.out.println("Ação recebida: " + action);
-                    handleAction(action, in, out, clientSocket);
+                    while (!clientSocket.isClosed()) {
+                        try {
+                            String action = in.readUTF();
+                            System.out.println("Ação recebida: " + action);
+                            handleAction(action, in, out, clientSocket);
+                        } catch (EOFException e) {
+                            System.out
+                                    .println("Cliente desconectado: " + clientSocket.getInetAddress().getHostAddress());
+                            break; // Encerrar o loop se o cliente desconectar
+                        } catch (IOException e) {
+                            System.out.println("Erro de comunicação: " + e.getMessage());
+                            break; // Encerrar o loop em caso de outro erro de comunicação
+                        }
+                    }
                 } catch (IOException e) {
-                    System.out.println("Erro de comunicação: " + e.getMessage());
-                    clientSocket.close(); // Fechar o socket do cliente em caso de erro
+                    System.out.println("Erro com o socket do cliente: " + e.getMessage());
                 }
             }
         } catch (IOException e) {
@@ -38,26 +49,19 @@ public class EchoServer {
             throws IOException {
         switch (action) {
             case "register":
-                System.out.println("Registrando usuário...");
                 handleRegister(in, out);
                 break;
             case "login":
-                // Lê o nome de usuário como antes
-                String username = in.readUTF();
-                // Agora espera a próxima ação para ser "password"
-                String passwordAction = in.readUTF();
-                if ("password".equals(passwordAction)) {
-                    String password = in.readUTF(); // Lê a senha
-                    handleLogin(username, password, out);
-                }
+                handleLogin(in, out);
                 break;
             case "status":
-                System.out.println("Enviando status do servidor...");
                 handleStatus(out);
                 break;
             case "enviarTarefa":
-                System.out.println("Processando tarefa...");
-                handleTaskSubmission(in, clientSocket);
+                handleTaskSubmission(in, clientSocket, out);
+                break;
+            case "exit":
+                handleClientExit(clientSocket);
                 break;
             default:
                 out.writeUTF("Ação desconhecida.");
@@ -66,46 +70,77 @@ public class EchoServer {
     }
 
     private static void handleRegister(DataInputStream in, DataOutputStream out) throws IOException {
-        try {
-            String combinedCredentials = in.readUTF();
-            String[] credentials = combinedCredentials.split(";");
-            if (credentials.length != 2) {
-                out.writeUTF("Dados inválidos.");
-                return;
-            }
-            String username = credentials[0].trim();
-            String password = credentials[1].trim();
+        String username = in.readUTF(); // Lê o nome de usuário
+        String password = in.readUTF(); // Lê a senha
 
-            boolean success = userManager.registerUser(username, password);
-            String response = success ? "Registo bem-sucedido." : "Nome de utilizador já existe.";
-            out.writeUTF(response);
-        } catch (Exception e) {
-            out.writeUTF("Erro no registro: " + e.getMessage());
-        }
+        boolean success = userManager.registerUser(username, password);
+        String response = success ? "Registo bem-sucedido." : "Nome de utilizador já existe.";
+        out.writeUTF(response);
     }
 
-    private static void handleLogin(String username, String password, DataOutputStream out) throws IOException {
-        System.out.println("Entrando no método handleLogin");
-        System.out.println("Nome de usuário lido: " + username);
-        System.out.println("Senha recebida (antes do hash): '" + password + "'"); // Log para depuração
+    private static void handleLogin(DataInputStream in, DataOutputStream out) throws IOException {
+        String username = in.readUTF(); // Lê o nome de usuário
+        String password = in.readUTF(); // Lê a senha
 
         boolean isAuthenticated = userManager.authenticate(username, password);
         String response = isAuthenticated ? "Bem-vindo " + username : "Falha na autenticação.";
         out.writeUTF(response);
-        System.out.println("Resposta enviada: " + response);
     }
 
     private static void handleStatus(DataOutputStream out) throws IOException {
-        out.writeUTF("Memória disponível: " + getAvailableMemory() + " bytes");
-        out.writeUTF("Tarefas pendentes: " + taskQueueManager.getTaskCount());
+        long availableMemory = getAvailableMemory();
+        int pendingTasks = taskQueueManager.getTaskCount();
+
+        System.out.println("Enviando status: Memória disponível - " + availableMemory +
+                " bytes, Tarefas pendentes - " + pendingTasks);
+
+        out.writeUTF("Memória disponível: " + availableMemory + " bytes");
+        out.writeUTF("Tarefas pendentes: " + pendingTasks);
     }
 
-    private static void handleTaskSubmission(DataInputStream in, Socket clientSocket) throws IOException {
-        byte[] taskData = receiveTaskData(in);
-        long memoryRequired = in.readLong();
+    private static void handleTaskSubmission(DataInputStream in, Socket clientSocket, DataOutputStream out)
+            throws IOException {
+        try {
+            System.out.println("Preparando para ler dados da tarefa...");
+
+            // Lê o tamanho dos dados da tarefa
+            System.out.println("Lendo tamanho dos dados da tarefa...");
+            int dataSize = in.readInt();
+            System.out.println("Tamanho dos dados da tarefa recebido: " + dataSize + " bytes");
+
+            // Lê os dados da tarefa
+            System.out.println("Lendo dados da tarefa...");
+            byte[] taskData = new byte[dataSize];
+            in.readFully(taskData);
+            System.out.println("Dados da tarefa recebidos com sucesso. Tamanho: " + dataSize + " bytes");
+
+            // Lê a memória requerida para a tarefa
+            System.out.println("Lendo memória requerida para a tarefa...");
+            long memoryRequired = in.readLong();
+            System.out.println("Memória requerida para a tarefa: " + memoryRequired + " bytes");
+
+            // Processa a tarefa
+            processReceivedTaskData(clientSocket, taskData, memoryRequired, out);
+        } catch (IOException e) {
+            System.out.println("Erro ao ler dados da tarefa: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    private static void processReceivedTaskData(Socket clientSocket, byte[] taskData, long memoryRequired,
+            DataOutputStream out) throws IOException {
+        System.out.println("Processando dados da tarefa recebidos...");
         Task task = new Task(clientSocket, taskData, memoryRequired);
-        taskQueueManager.addTask(task);
-        new Thread(() -> processTask(task)).start();
+
+        if (taskQueueManager.canAddTask(task)) {
+            taskQueueManager.addTask(task);
+            new Thread(() -> processTask(task)).start();
+            System.out.println("Tarefa adicionada à fila e processamento iniciado.");
+            out.writeUTF("Tarefa adicionada à fila");
+        } else {
+            System.out.println("Falha ao adicionar tarefa: memória insuficiente.");
+            out.writeUTF("Não há memória suficiente para executar a tarefa");
+        }
     }
 
     private static long getAvailableMemory() {
@@ -114,10 +149,13 @@ public class EchoServer {
 
     private static void processTask(Task task) {
         try {
+            System.out.println("Processando tarefa...");
             byte[] result = sd23.JobFunction.execute(task.getData());
             sendTaskResult(task.getClientSocket(), "Sucesso", result);
+            System.out.println("Tarefa processada com sucesso. Enviando resultados...");
         } catch (sd23.JobFunctionException e) {
             sendTaskResult(task.getClientSocket(), "Erro na execução da tarefa: " + e.getMessage(), null);
+            System.out.println("Erro na execução da tarefa: " + e.getMessage());
         } finally {
             taskQueueManager.releaseMemory(task.getMemoryRequired());
             closeClientSocket(task.getClientSocket());
@@ -135,6 +173,15 @@ public class EchoServer {
         }
     }
 
+    private static void handleClientExit(Socket clientSocket) {
+        try {
+            System.out.println("Fechando conexão com o cliente: " + clientSocket.getInetAddress().getHostAddress());
+            clientSocket.close();
+        } catch (IOException e) {
+            System.out.println("Erro ao fechar o socket do cliente: " + e.getMessage());
+        }
+    }
+
     private static void closeClientSocket(Socket clientSocket) {
         try {
             if (clientSocket != null && !clientSocket.isClosed()) {
@@ -146,9 +193,16 @@ public class EchoServer {
     }
 
     private static byte[] receiveTaskData(DataInputStream in) throws IOException {
-        int dataSize = in.readInt();
-        byte[] data = new byte[dataSize];
-        in.readFully(data);
-        return data;
+        try {
+            int dataSize = in.readInt();
+            byte[] data = new byte[dataSize];
+            in.readFully(data);
+            System.out.println("Dados da tarefa recebidos com sucesso. Tamanho: " + dataSize + " bytes");
+            return data;
+        } catch (IOException e) {
+            System.out.println("Erro ao receber dados da tarefa: " + e.getMessage());
+            throw e;
+        }
     }
+
 }
