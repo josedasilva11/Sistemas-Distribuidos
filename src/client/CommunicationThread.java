@@ -11,15 +11,17 @@ public class CommunicationThread implements Runnable {
     private final ConcurrentLinkedQueue<Request> requestQueue;
     private final ResponseCallback responseCallback;
 
+    // Construtor
     public CommunicationThread(Socket socket, ResponseCallback responseCallback) throws IOException {
-        this.socket = socket; // Adicionar esta linha
-        this.out = new DataOutputStream(socket.getOutputStream());
-        this.in = new DataInputStream(socket.getInputStream());
-        this.requestQueue = new ConcurrentLinkedQueue<>();
-        this.responseCallback = responseCallback;
+        this.socket = socket; // Socket do cliente
+        this.out = new DataOutputStream(socket.getOutputStream()); // Enviar dados
+        this.in = new DataInputStream(socket.getInputStream()); // Receber dados
+        this.requestQueue = new ConcurrentLinkedQueue<>(); // Queue de requets
+        this.responseCallback = responseCallback; // Callback para as respostas
     }
 
     @Override
+    // Envia as requests e escuta as respostas
     public void run() {
         try {
             while (!Thread.currentThread().isInterrupted()) {
@@ -35,15 +37,17 @@ public class CommunicationThread implements Runnable {
         return out;
     }
 
+    // Envia as requests presentes na queue
     private void sendPendingRequests() throws IOException {
         while (!requestQueue.isEmpty()) {
             Request request = requestQueue.poll();
-            System.out.println("Enviando pedido: " + request.getAction());
+            System.out.println("A enviar pedido: " + request.getAction());
             out.writeUTF(request.getAction());
             out.writeUTF(request.getData()); // Adicione esta linha
         }
     }
 
+    // Escuta as respostas do server
     private void listenForResponses() {
         new Thread(() -> {
             try {
@@ -52,10 +56,10 @@ public class CommunicationThread implements Runnable {
                         String response = in.readUTF();
                         responseCallback.onResponseReceived(response);
                     } catch (EOFException e) {
-                        System.out.println("Fim do stream alcançado, fechando a thread de escuta.");
+                        System.out.println("Fim do stream alcançado, a fechar a thread de escuta.");
                         break;
                     }
-                    Thread.sleep(100);
+                    Thread.sleep(100); 
                 }
             } catch (IOException e) {
                 if (!this.socket.isClosed()) {
@@ -68,6 +72,7 @@ public class CommunicationThread implements Runnable {
         }).start();
     }
 
+    // Adiciona uma request à queue
     public void addRequest(Request request) {
         requestQueue.add(request);
     }

@@ -8,9 +8,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.Base64;
 
 public class EchoClient {
-    private static volatile boolean isLoggedIn = false;
-    private static CompletableFuture<Void> loginFuture = new CompletableFuture<>();
-    private static CompletableFuture<Void> responseFuture = new CompletableFuture<>();
+    private static volatile boolean isLoggedIn = false; // guarda o estado de login
+    private static CompletableFuture<Void> loginFuture = new CompletableFuture<>(); // Future para a ação login
+    private static CompletableFuture<Void> responseFuture = new CompletableFuture<>(); // Future para a resposta do server
 
     public static void main(String[] args) {
         String hostName = "localhost";
@@ -20,6 +20,7 @@ public class EchoClient {
             Socket socket = new Socket(hostName, port);
             System.out.println("Conectado ao servidor em " + hostName + ":" + port);
 
+            // Define o callback quando há uma resposta
             ResponseCallback callback = response -> {
                 System.out.println("Resposta do servidor: " + response);
                 responseFuture.complete(null); // Sinaliza que a resposta foi recebida
@@ -28,10 +29,13 @@ public class EchoClient {
                     loginFuture.complete(null); // Completa o futuro quando o login é bem-sucedido
                 }
             };
+
+            // Cria e inicia a thread 
             CommunicationThread commThread = new CommunicationThread(socket, callback);
             Thread commThreadRunner = new Thread(commThread);
             commThreadRunner.start();
 
+            // Apresenta as opções consoante o estado de autenticação  
             Scanner scanner = new Scanner(System.in);
             while (true) {
                 if (!isLoggedIn) {
@@ -45,14 +49,14 @@ public class EchoClient {
                     commThreadRunner.interrupt(); // Interrompe a thread de comunicação
                     break;
                 }
-                handleUserInput(action, scanner, commThread, socket); // Passa socket como argumento
+                handleUserInput(action, scanner, commThread, socket); // Passa o socket como argumento
 
                 responseFuture = new CompletableFuture<>();
                 responseFuture.join(); // Aguarda a resposta do servidor
 
                 if ("login".equals(action)) {
                     loginFuture.join(); // Aguarda a conclusão do futuro
-                    loginFuture = new CompletableFuture<>(); // Reset para próximos logins
+                    loginFuture = new CompletableFuture<>(); // Reset para os logins seguintes
                 }
             }
 
@@ -65,15 +69,15 @@ public class EchoClient {
         }
     }
 
+    // Define o comportamento conforme a ação escolhida pelo cliente
     private static void handleUserInput(String action, Scanner scanner, CommunicationThread commThread, Socket socket) {
-
         switch (action) {
             case "register":
-                System.out.println("Registrando usuário...");
+                System.out.println("Registando utillizador...");
                 sendCredentials(scanner, commThread, "register");
                 break;
             case "login":
-                System.out.println("Autenticando usuário...");
+                System.out.println("Autenticando utillizador...");
                 sendCredentials(scanner, commThread, "login");
                 break;
             case "status":
@@ -101,20 +105,20 @@ public class EchoClient {
         }
     }
 
+    // Envia as credenciais para registo/autenticação
     private static void sendCredentials(Scanner scanner, CommunicationThread commThread, String actionType) {
         System.out.println("Digite o seu nome de utilizador:");
         String username = scanner.nextLine();
         System.out.println("Digite a sua password:");
         String password = scanner.nextLine();
 
-        // Codificação Base64 da senha
         String encodedPassword = Base64.getEncoder().encodeToString(password.getBytes());
 
         commThread.addRequest(new Request(actionType, username));
         commThread.addRequest(new Request("password", encodedPassword));
     }
 
-    // Método para lidar com o envio do arquivo
+    // Responsável pelo envio de um arquivo
     private static void handleFileSending(Scanner scanner, CommunicationThread commThread) {
         try {
             System.out.println("Escreva o caminho do arquivo de tarefa:");
@@ -123,19 +127,19 @@ public class EchoClient {
             byte[] fileContent = Files.readAllBytes(file.toPath());
 
             System.out.println("Escreva a quantidade de memória necessária para a tarefa (em MB):");
-            long memoryRequired = Long.parseLong(scanner.nextLine()) * 1024 * 1024; // Convertendo de MB para bytes
+            long memoryRequired = Long.parseLong(scanner.nextLine()) * 1024 * 1024; // Converte de MB para bytes
 
             DataOutputStream out = commThread.getDataOutputStream();
 
-            // Primeiro, envia o tamanho do conteúdo do arquivo
+            // Envia o tamanho
             System.out.println("Enviando tamanho do arquivo: " + fileContent.length + " bytes");
             out.writeInt(fileContent.length);
 
-            // Em seguida, envia o conteúdo do arquivo
+            // Envia o conteúdo
             System.out.println("Enviando conteúdo do arquivo...");
             out.write(fileContent);
 
-            // Por último, envia a quantidade de memória requerida
+            // Envia a quantiade de memória necessária
             System.out.println("Enviando memória requerida para a tarefa: " + memoryRequired + " bytes");
             out.writeLong(memoryRequired);
 
